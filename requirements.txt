@@ -6,3 +6,4 @@ langchain_ollama
 langchain_core
 sentence_transformers (via HuggingFaceEmbeddings)
 chromadb
+langchain-chroma
