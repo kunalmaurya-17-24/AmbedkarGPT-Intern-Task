@@ -84,13 +84,13 @@ def cli(rag_chain):
 
 def main():
     print("Loading speech.txt ...")
-    docs = load_documents("speech.txt")
+    docs = load_speech("speech.txt")
 
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     chunks = splitter.split_documents(docs)
 
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    db = build_vector_db(chunks, embeddings)
+    db = vector_db(chunks, embeddings)
     pipeline = rag_pipeline(db)
 
     cli(rag_chain)
