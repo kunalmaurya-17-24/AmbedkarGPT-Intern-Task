@@ -19,19 +19,19 @@ def load_documents(path: str):
 def build_vector_db(docs, embeddings, persist_dir="chroma_db"):
     if os.path.exists(persist_dir):
         print("Loading existing Chroma database...")
-        vectordb = Chroma(
+        db = Chroma(
             persist_directory=persist_dir,
             embedding_function=embeddings
         )
     else:
         print("Creating new Chroma database...")
-        vectordb = Chroma.from_documents(
+        db = Chroma.from_documents(
             docs,
             embeddings,
             persist_directory=persist_dir
         )
-        vectordb.persist()
-    return vectordb
+        db.persist()
+    return db
 
 # pipeline is here
 def build_rag_pipeline(vectorstore):
@@ -54,7 +54,7 @@ Answer:
     def format_docs(docs):
         return "\n\n".join(doc.page_content for doc in docs)
 
-    rag_chain = (
+    pipeline = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | prompt
         | llm
@@ -91,7 +91,7 @@ def main():
 
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     vectordb = build_vector_db(chunks, embeddings)
-    rag_chain = build_rag_pipeline(vectordb)
+    pipeline = build_rag_pipeline(db)
 
     run_cli(rag_chain)
 
