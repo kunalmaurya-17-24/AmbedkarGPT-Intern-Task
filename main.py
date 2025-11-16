@@ -9,14 +9,14 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 
 # Load documents rn
-def load_documents(path: str):
+def load_speech(path: str):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Error: '{path}' not found.")
     loader = TextLoader(path, encoding="utf-8")
     return loader.load()
 
 # chroma store storeage 
-def build_vector_db(docs, embeddings, persist_dir="chroma_db"):
+def init_db(docs, embeddings, persist_dir="chroma_db"):
     if os.path.exists(persist_dir):
         print("Loading existing Chroma database...")
         db = Chroma(
@@ -34,7 +34,7 @@ def build_vector_db(docs, embeddings, persist_dir="chroma_db"):
     return db
 
 # pipeline is here
-def build_rag_pipeline(vectorstore):
+def rag_pipeline(vectorstore):
     llm = ChatOllama(model="mistral",stream=True)
     prompt_template = """
 You are AmbedkarGPT. Answer the question based ONLY on the provided context.
@@ -63,7 +63,7 @@ Answer:
 
 # CLI wit steaming like gpt
 
-def run_cli(rag_chain):
+def cli(rag_chain):
     print("\n--- AmbedkarGPT CLI (Streaming Enabled) ---")
     print("Type 'exit' to quit.")
     while True:
@@ -90,10 +90,10 @@ def main():
     chunks = splitter.split_documents(docs)
 
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    vectordb = build_vector_db(chunks, embeddings)
-    pipeline = build_rag_pipeline(db)
+    db = build_vector_db(chunks, embeddings)
+    pipeline = rag_pipeline(db)
 
-    run_cli(rag_chain)
+    cli(rag_chain)
 
 if __name__ == "__main__":
     main()
