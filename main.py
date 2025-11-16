@@ -15,7 +15,7 @@ def load_documents(path: str):
     loader = TextLoader(path, encoding="utf-8")
     return loader.load()
 
-# Create or load persistent Chroma vectorstore
+# chroma store storeage 
 def build_vector_db(docs, embeddings, persist_dir="chroma_db"):
     if os.path.exists(persist_dir):
         print("Loading existing Chroma database...")
@@ -33,7 +33,7 @@ def build_vector_db(docs, embeddings, persist_dir="chroma_db"):
         vectordb.persist()
     return vectordb
 
-# Build RAG pipeline using modern Runnable pattern
+# pipeline is here
 def build_rag_pipeline(vectorstore):
     llm = ChatOllama(model="mistral",stream=True)
     prompt_template = """
