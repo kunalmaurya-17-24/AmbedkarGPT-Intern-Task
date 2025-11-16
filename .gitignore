@@ -1,0 +1,18 @@
+# ignore venv
+venv/
+sholder/
+
+# ignore vector database
+chroma_db/
+
+# ignore python cache
+__pycache__/
+*.pyc
+
+# ignore OS files
+.DS_Store
+Thumbs.db
+
+# ignore model cache
+.cache/
+huggingface/
