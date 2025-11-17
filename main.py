@@ -1,109 +1,107 @@
-import os
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
-
+import os
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 
 
-# just load the file (basic check)
-def load_speech(path):
-    if not os.path.exists(path):
-        print("file not found:", path)
-        raise FileNotFoundError(path)
-    return TextLoader(path, encoding="utf-8").load()
 
+PERSIST_DIR = "chroma_db"
 
-# chroma storage (load or create)
-def init_db(docs, embeddings, persist_dir="chroma_db"):
-    if os.path.exists(persist_dir):
-        print("Using existing Chroma DB...")
-        return Chroma(
-            persist_directory=persist_dir,
-            embedding_function=embeddings
+def format_docs(docs):
+    return "\n\n".join(doc.page_content for doc in docs)
+
+def main():
+    hf_embeddings = HuggingFaceEmbeddings(model='all-MiniLM-L6-v2')
+    
+    if os.path.exists(PERSIST_DIR) and os.path.isdir(PERSIST_DIR):
+        print("Loading existing vectorDB")
+        vectorstore = Chroma(
+            collection_name="collection_db",
+            embedding_function=hf_embeddings,
+            persist_directory=PERSIST_DIR
         )
     else:
-        print("Creating new Chroma DB...")
-        db = Chroma.from_documents(
-            docs,
-            embeddings,
-            persist_directory=persist_dir
+        print("Creating vector store")
+
+        loader = TextLoader('speech.txt')
+        documents = loader.load()
+        
+
+        text_splitter = RecursiveCharacterTextSplitter(
+            separators=["\n\n", "\n", " ", ""],
+            chunk_size=200,
+            chunk_overlap=50
         )
-        db.persist()
-        return db
+        split_docs = text_splitter.split_documents(documents)
+        
 
+        vectorstore = Chroma(
+            collection_name="collection_db",
+            embedding_function=hf_embeddings,
+            persist_directory=PERSIST_DIR
+        )
+        
 
-# build the RAG chain (llm + retriever)
-def build_pipeline(vstore):
-    llm = ChatOllama(model="mistral", stream=True)
+        texts = [doc.page_content for doc in split_docs]
+        vectorstore.add_texts(texts=texts)
+    
 
-    # keeping the prompt simple, not too LLM-formal
-    template = """
-You're AmbedkarGPT. Use ONLY the context.  
-If it's not in the context, just say you don't know.
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
+    
+
+    prompt = ChatPromptTemplate.from_messages([
+        """
+You are AmbedkarGPT. Answer the question based ONLY on the provided context.
+If the answer is not in the context, reply:
+"I cannot answer this from the given text."
 
 Context:
 {context}
 
 Question: {question}
 
-Answer:
+Answer:  
 """
-    prompt = ChatPromptTemplate.from_template(template)
+    ])
+    
 
-    retriever = vstore.as_retriever(search_kwargs={"k": 2})
+    llm = ChatOllama(model="mistral", stream=True)
+    
 
-    def join_docs(docs):
-        return "\n\n".join(d.page_content for d in docs)
-
-    chain = (
-        {"context": retriever | join_docs, "question": RunnablePassthrough()}
+    rag_chain = (
+        {
+            "context": retriever | format_docs,
+            "question": RunnablePassthrough(),
+        }
         | prompt
         | llm
     )
-    return chain
-
-
-# simple CLI
-def cli(chain):
-    print("\n--- AmbedkarGPT CLI ---")
-    print("(type 'exit' to quit)\n")
+    
+    print("\n" + "="*50)
+    print("AmbedkarGPT - Q and Ans tool")
+    print("="*50)
+    print("Type 'exit' to quit.\n")
+    
 
     while True:
-        q = input("Ask something: ").strip()
-        if q.lower() in ("exit", "quit"):
-            print("bye!")
+        user_input = input("Question: ").strip()
+        
+        if user_input.lower() in ['exit', 'quit', 'q']:
+            print("Goodbye!")
             break
-
-        print("Answer: ", end="", flush=True)
-
-        # streaming
-        for chunk in chain.stream(q):
-            if hasattr(chunk, "content") and chunk.content:
+            
+        if not user_input:
+            continue
+        
+        print("\nAnswer: ", end="")
+        for chunk in rag_chain.stream(user_input):
+            if hasattr(chunk, 'content'):
                 print(chunk.content, end="", flush=True)
-
-        print("\n" + "-" * 40)
-
-
-def main():
-    print("Loading speech.txt...")
-    docs = load_speech("speech.txt")
-
-    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    parts = splitter.split_documents(docs)
-    print("chunks:", len(parts))  # small debug print, very human-like
-
-    emb = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-
-    db = init_db(parts, emb)
-
-    chain = build_pipeline(db)
-
-    cli(chain)
-
+        print("\n")
 
 if __name__ == "__main__":
     main()
